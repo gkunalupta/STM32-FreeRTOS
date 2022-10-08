@@ -17,6 +17,7 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
+#include "w25q128jv.h"
 #include "main.h"
 #include "cmsis_os.h"
 
@@ -32,41 +33,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define WriteEnable 0x06
-#define WriteDisable 0x04
-#define Dummybyte 0xA5
 
-#define ReadSR1 0x05
-#define WriteSR1 0x01
-#define ReadSR2 0x35  //0x35: 00110101
-#define WriteSR2 0x31
-#define ReadSR3 0x15
-#define WriteSR3 0x11
-
-
-#define Write_Enab_for_Vol_status_regist 0x50
-
-#define ReadData 0x03
-#define WriteData 0x02
-#define ReadDataFast 0x0B
-
-
-#define JEDECID 0x9F
-#define UinqueID 0x4B
-
-#define SectErase4KB 0x20
-#define SectErase32KB 0x52
-#define SectErase64KB 0xD8
-#define chiperase 0xC7
-
-#define reset1 0x66
-#define reset2 0x99
-
-#define read_addr1 0x020000
-#define read_addr2 0x030000
-#define read_addr3 0x040000
-
-#define BUSY_BIT 0x01
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -99,179 +66,212 @@ void StartTask03(void const * argument);
 uint8_t val[10] = "Gettobyte\n";
 uint8_t rxbuff[10];
 
-/* USER CODE END PFP */
-
-/* Private user code ---------------------------------------------------------*/
-/* USER CODE BEGIN 0 */
-#define cs_set() HAL_GPIO_WritePin(GPIOA,GPIO_PIN_4,GPIO_PIN_SET)
-#define cs_reset() HAL_GPIO_WritePin(GPIOA,GPIO_PIN_4,GPIO_PIN_RESET)
-
 uint8_t rx_buf[1025];
-uint8_t tx_buf[10];
-void SPI1_Send (uint8_t *dt, uint16_t cnt)
-{
-  HAL_SPI_Transmit (&hspi1, dt, cnt, 5000);
-
-}
-void SPI1_Recv (uint8_t *dt, uint16_t cnt)
-{
-  HAL_SPI_Receive (&hspi1, dt, cnt, 5000);
-}
-void W25_Reset (void)
-{
-  cs_reset();
-  tx_buf[0] = reset1;
-  tx_buf[1] = reset2;
-  SPI1_Send(tx_buf, 2);
-  cs_set();
-}
-void WriteEnable_flash()
-{
-	cs_reset();
-	tx_buf[0] = WriteEnable;
-	SPI1_Send(tx_buf,1);
-	cs_set();
-
-}
-void W25_Read_Data(uint32_t addr, uint8_t* data, uint32_t sz)
-{
-  cs_reset();
-  tx_buf[0] = ReadData;
-  tx_buf[1] = (addr >> 16) & 0xFF;
-  tx_buf[2] = (addr >> 8) & 0xFF;
-  tx_buf[3] = addr & 0xFF;
-  SPI1_Send(tx_buf, 4);
-  SPI1_Recv(data, sz);
-  cs_set();
-}
-void W25_Write_Data(uint32_t addr, uint8_t* data, uint32_t sz)
-{
-	WriteEnable_flash();
-	  HAL_Delay(100);
-  cs_reset();
-  tx_buf[0] = WriteData;
-  tx_buf[1] = (addr >> 16) & 0xFF;
-  tx_buf[2] = (addr >> 8) & 0xFF;
-  tx_buf[3] = addr & 0xFF;
-  SPI1_Send(tx_buf, 4);
-  SPI1_Send(data, sz);
-  cs_set();
-}
-uint32_t W25_Read_ID(void)
-{
-  uint8_t dt[4];
-  tx_buf[0] = JEDECID;
-  cs_reset();
-  SPI1_Send(tx_buf, 1);
-  SPI1_Recv(dt,3);
-  cs_set();
-  return (dt[0] << 16) | (dt[1] << 8) | dt[2];
-}
-void W25_Ini(void)
-{
-  HAL_Delay(100);
-  W25_Reset();
-  HAL_Delay(100);
-  unsigned int id = W25_Read_ID();
-  // HAL_UART_Transmit(&huart2,(uint8_t*)"\r\n",2,0x1000);
-  // sprintf(str1,"ID:0x%X\r\n",id);
-  // HAL_UART_Transmit(&huart2,(uint8_t*)str1,strlen(str1),0x1000);
-}
-void erase_sector4KB(uint32_t addr)
-{
-
-	WriteEnable_flash();
-	HAL_Delay(100);
-	cs_reset();
-	tx_buf[0] = SectErase4KB;
-	tx_buf[1] = (addr >> 16) & 0xFF;
-	tx_buf[2] = (addr >> 8) & 0xFF;
-	tx_buf[3] = addr & 0xFF;
-	SPI1_Send(tx_buf,4);
-	cs_set();
-}
-void erase_sector32KB(uint32_t addr)
-{
-	WriteEnable_flash();
-	cs_reset();
-	tx_buf[0] = SectErase32KB;
-	tx_buf[1] = (addr >> 16) & 0xFF;
-	tx_buf[2] = (addr >> 8) & 0xFF;
-	tx_buf[3] = addr & 0xFF;
-	SPI1_Send(tx_buf,4);
-	cs_set();
-}
-void erase_sector64KB(uint32_t addr)
-{
-	WriteEnable_flash();
-	cs_reset();
-	tx_buf[0] = SectErase64KB;
-	tx_buf[1] = (addr >> 16) & 0xFF;
-	tx_buf[2] = (addr >> 8) & 0xFF;
-	tx_buf[3] = addr & 0xFF;
-	SPI1_Send(tx_buf,4);
-	cs_set();
-}
-void chip_erase()
-{
-	WriteEnable_flash();
-	cs_reset();
-	tx_buf[0] = chiperase;
-	SPI1_Send(tx_buf,1);
-	cs_set();
-}
-void Uinque_ID(uint8_t uinque[])
-{
-	cs_reset();
-	tx_buf[0] = UinqueID;
-
-}
-void WriteSR(uint8_t SR_address, uint8_t SR_data)
-{
-	WriteEnable_flash();
-	cs_reset();
-	tx_buf[0] = SR_address;
-	tx_buf[1] = SR_data;
-	SPI1_Send(tx_buf,2);
-	cs_set();
-
-}
-uint8_t ReadSR(uint8_t SR_address)
-{
-	uint8_t RSR[1] = {0};
-	cs_reset();
-	tx_buf[0] =  SR_address;
-	SPI1_Send(tx_buf,1);
-	SPI1_Recv(RSR,1);
-	cs_set();
-	return RSR[0];
-}
-void WaitForWriteEnd(void)
-{
-	uint8_t StatusRegist1[1] = {0};
-	cs_reset();
-	tx_buf[0] = ReadSR1;
-	SPI1_Send(tx_buf,1);
-	SPI1_Recv(StatusRegist1,1);
-	do
-  {
-		tx_buf[0] = Dummybyte;
-		SPI1_Send(tx_buf,1);
-		SPI1_Recv(StatusRegist1,1);
-    }
-  while ((StatusRegist1[0] & 0x01) == 0x01);
-  cs_set();
-}
 uint8_t dt[4];
-
-uint8_t x = 10;
-uint8_t y = 30;
-uint8_t z = 0;
-
 
 //uint8_t*tran_buff = "0000/285444500/771888200/00100/255/000/010/0000/285444500/771888200/00100/255/000/010/0000/285444500/771888200/00100/255/000/010/\n";
 
 uint8_t *tran_buff = "Kunal Gupta is maker of gettobyte\n";
+
+uint8_t x =0;
+/* USER CODE END PFP */
+
+/* Private user code ---------------------------------------------------------*/
+/* USER CODE BEGIN 0 */
+//
+//#define WriteEnable 0x06
+//#define WriteDisable 0x04
+//#define Dummybyte 0xA5
+//
+//#define ReadSR1 0x05
+//#define WriteSR1 0x01
+//#define ReadSR2 0x35  //0x35: 00110101
+//#define WriteSR2 0x31
+//#define ReadSR3 0x15
+//#define WriteSR3 0x11
+//
+//
+//#define Write_Enab_for_Vol_status_regist 0x50
+//
+//#define ReadData 0x03
+//#define WriteData 0x02
+//#define ReadDataFast 0x0B
+//
+//
+//#define JEDECID 0x9F
+//#define UinqueID 0x4B
+//
+//#define SectErase4KB 0x20
+//#define SectErase32KB 0x52
+//#define SectErase64KB 0xD8
+//#define chiperase 0xC7
+//
+//#define reset1 0x66
+//#define reset2 0x99
+//
+//#define read_addr1 0x020000
+//#define read_addr2 0x030000
+//#define read_addr3 0x040000
+//
+//#define BUSY_BIT 0x01
+//
+//#define cs_set() HAL_GPIO_WritePin(GPIOA,GPIO_PIN_4,GPIO_PIN_SET)
+//#define cs_reset() HAL_GPIO_WritePin(GPIOA,GPIO_PIN_4,GPIO_PIN_RESET)
+//uint8_t tx_buf[10];
+//void SPI1_Send (uint8_t *dt, uint16_t cnt)
+//{
+//  HAL_SPI_Transmit (&hspi1, dt, cnt, 5000);
+//
+//}
+//void SPI1_Recv (uint8_t *dt, uint16_t cnt)
+//{
+//  HAL_SPI_Receive (&hspi1, dt, cnt, 5000);
+//}
+//void W25_Reset (void)
+//{
+//  cs_reset();
+//  tx_buf[0] = reset1;
+//  tx_buf[1] = reset2;
+//  SPI1_Send(tx_buf, 2);
+//  cs_set();
+//}
+//void WriteEnable_flash()
+//{
+//	cs_reset();
+//	tx_buf[0] = WriteEnable;
+//	SPI1_Send(tx_buf,1);
+//	cs_set();
+//
+//}
+//void W25_Read_Data(uint32_t addr, uint8_t* data, uint32_t sz)
+//{
+//  cs_reset();
+//  tx_buf[0] = ReadData;
+//  tx_buf[1] = (addr >> 16) & 0xFF;
+//  tx_buf[2] = (addr >> 8) & 0xFF;
+//  tx_buf[3] = addr & 0xFF;
+//  SPI1_Send(tx_buf, 4);
+//  SPI1_Recv(data, sz);
+//  cs_set();
+//}
+//void W25_Write_Data(uint32_t addr, uint8_t* data, uint32_t sz)
+//{
+//	WriteEnable_flash();
+//	  HAL_Delay(100);
+//  cs_reset();
+//  tx_buf[0] = WriteData;
+//  tx_buf[1] = (addr >> 16) & 0xFF;
+//  tx_buf[2] = (addr >> 8) & 0xFF;
+//  tx_buf[3] = addr & 0xFF;
+//  SPI1_Send(tx_buf, 4);
+//  SPI1_Send(data, sz);
+//  cs_set();
+//}
+//uint32_t W25_Read_ID(void)
+//{
+//  uint8_t dt[4];
+//  tx_buf[0] = JEDECID;
+//  cs_reset();
+//  SPI1_Send(tx_buf, 1);
+//  SPI1_Recv(dt,3);
+//  cs_set();
+//  return (dt[0] << 16) | (dt[1] << 8) | dt[2];
+//}
+//void W25_Ini(void)
+//{
+//  HAL_Delay(100);
+//  W25_Reset();
+//  HAL_Delay(100);
+//  unsigned int id = W25_Read_ID();
+//  // HAL_UART_Transmit(&huart2,(uint8_t*)"\r\n",2,0x1000);
+//  // sprintf(str1,"ID:0x%X\r\n",id);
+//  // HAL_UART_Transmit(&huart2,(uint8_t*)str1,strlen(str1),0x1000);
+//}
+//void erase_sector4KB(uint32_t addr)
+//{
+//
+//	WriteEnable_flash();
+//	HAL_Delay(100);
+//	cs_reset();
+//	tx_buf[0] = SectErase4KB;
+//	tx_buf[1] = (addr >> 16) & 0xFF;
+//	tx_buf[2] = (addr >> 8) & 0xFF;
+//	tx_buf[3] = addr & 0xFF;
+//	SPI1_Send(tx_buf,4);
+//	cs_set();
+//}
+//void erase_sector32KB(uint32_t addr)
+//{
+//	WriteEnable_flash();
+//	cs_reset();
+//	tx_buf[0] = SectErase32KB;
+//	tx_buf[1] = (addr >> 16) & 0xFF;
+//	tx_buf[2] = (addr >> 8) & 0xFF;
+//	tx_buf[3] = addr & 0xFF;
+//	SPI1_Send(tx_buf,4);
+//	cs_set();
+//}
+//void erase_sector64KB(uint32_t addr)
+//{
+//	WriteEnable_flash();
+//	cs_reset();
+//	tx_buf[0] = SectErase64KB;
+//	tx_buf[1] = (addr >> 16) & 0xFF;
+//	tx_buf[2] = (addr >> 8) & 0xFF;
+//	tx_buf[3] = addr & 0xFF;
+//	SPI1_Send(tx_buf,4);
+//	cs_set();
+//}
+//void chip_erase()
+//{
+//	WriteEnable_flash();
+//	cs_reset();
+//	tx_buf[0] = chiperase;
+//	SPI1_Send(tx_buf,1);
+//	cs_set();
+//}
+//void Uinque_ID(uint8_t uinque[])
+//{
+//	cs_reset();
+//	tx_buf[0] = UinqueID;
+//
+//}
+//void WriteSR(uint8_t SR_address, uint8_t SR_data)
+//{
+//	WriteEnable_flash();
+//	cs_reset();
+//	tx_buf[0] = SR_address;
+//	tx_buf[1] = SR_data;
+//	SPI1_Send(tx_buf,2);
+//	cs_set();
+//
+//}
+//uint8_t ReadSR(uint8_t SR_address)
+//{
+//	uint8_t RSR[1] = {0};
+//	cs_reset();
+//	tx_buf[0] =  SR_address;
+//	SPI1_Send(tx_buf,1);
+//	SPI1_Recv(RSR,1);
+//	cs_set();
+//	return RSR[0];
+//}
+//void WaitForWriteEnd(void)
+//{
+//	uint8_t StatusRegist1[1] = {0};
+//	cs_reset();
+//	tx_buf[0] = ReadSR1;
+//	SPI1_Send(tx_buf,1);
+//	SPI1_Recv(StatusRegist1,1);
+//	do
+//  {
+//		tx_buf[0] = Dummybyte;
+//		SPI1_Send(tx_buf,1);
+//		SPI1_Recv(StatusRegist1,1);
+//    }
+//  while ((StatusRegist1[0] & 0x01) == 0x01);
+//  cs_set();
+//}
 
 /* USER CODE END 0 */
 
@@ -306,7 +306,6 @@ int main(void)
   MX_SPI1_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -559,28 +558,21 @@ void StartTask03(void const * argument)
 {
   /* USER CODE BEGIN StartTask03 */
   /* Infinite loop */
-
-	  tx_buf[0] = JEDECID;
-		  cs_reset();
-		  SPI1_Send(tx_buf, 1);
-		  SPI1_Recv(dt,3);
-		  cs_set();
-
-		  erase_sector4KB(read_addr1);
-		  if((ReadSR(ReadSR1) & BUSY_BIT) == 0x01)
-		  {
-		   erase_sector4KB(read_addr1);
-		  }
-
-		  x = ReadSR(ReadSR1);
-		  HAL_Delay(100);
+	W25_Read_ID();
+	erase_sector4KB(read_addr1);
+	if((ReadSR(ReadSR1) & BUSY_BIT) == 0x01)
+	{
+	  erase_sector4KB(read_addr1);
+	}
+	x = ReadSR(ReadSR1);
+	//HAL_Delay(100);
 
   for(;;)
   {
 	 W25_Write_Data(read_addr1,tran_buff,35);
-	 HAL_Delay(100);
+	 osDelay(200);
 	 W25_Read_Data(read_addr1,rx_buf,35);
-	 HAL_Delay(100);
+	 osDelay(200);
      HAL_UART_Transmit(&huart1,rx_buf,35,100);
   }
   /* USER CODE END StartTask03 */
